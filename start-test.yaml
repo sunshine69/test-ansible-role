@@ -1,0 +1,46 @@
+# This is generic test role framework using vagrant
+# to use to test a role using the default var of the role, just run `ansible-playbook start-test.yaml` in this directory
+# to run some custom action before applying the role - write a task file named `pre-tasks-for-test-role-<YOUR_ROLE_NAME>.yaml` - it will be executed
+# to run after the role is called write a task file named `post-tasks-for-test-role-<YOUR_ROLE_NAME>.yaml`
+
+# You will be prompt for roles to test, if your role depends on other you can supply as coma list of role name, order priority based on list order.
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - pause:
+        prompt: "Enter the vagrant box for testing (default: generic/fedora32)"
+      register: box_name
+
+    - pause:
+        prompt: Enter ansible role to test
+      register: test_role
+
+    - set_fact:
+        box_name: "{{ box_name.user_input if box_name.user_input != '' else 'generic/fedora32' }}"
+
+    - name: Generate Vagrant file
+      template:
+        src: "{{ playbook_dir }}/Vagrantfile.j2"
+        dest: "{{ playbook_dir }}/Vagrantfile"
+
+    - name: Start vagrant
+      shell: vagrant up
+    # this test-host-vars.yaml is generated from the playbook gen-ansible-cfg.yaml which automatically started by vagrant in vagrantfile
+    # we use these data in the addhost call
+    # This tries to address a race conditiopn ( I think) make ansible not to work at the first time. In theory after the gen-ansible-cfg.yaml completed, the ansible.cfg has been generated and the inventory file created by vagrant is ready we dont have to do all it it.
+    # But the fact is ansible usually fail to find the host IP address at first run, even the ip is set in the inventory file makes me think some race condition is going on
+    # so we gather data - write to yaml and load it back here and dynamic add host and use that host
+    - include_vars: "{{ playbook_dir }}/test-host-vars.yaml"
+
+    - name: Add host test_host_manual
+      add_host:
+        name: "test_host"
+        groups: test_host_group
+        ansible_ssh_host: "{{ ansible_ssh_host }}"
+        ansible_ssh_port: "{{ ansible_ssh_port }}"
+        ansible_user: "{{ ansible_user }}"
+        ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file }}"
+        test_role: "{{ test_role.user_input if test_role.user_input != '' else 'common' }}"
+
+- import_playbook: "run-test.yaml"

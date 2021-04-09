@@ -1,0 +1,7 @@
+# vars for role input
+
+# List in the order for the tes to run (including the current role for testing)
+# The current role for testing always come last
+test_roles:
+  - depend_role
+  - test_role

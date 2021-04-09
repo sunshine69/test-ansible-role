@@ -1,0 +1,58 @@
+# Then run this playbook like this `ansible-playbook test-host-manual.yaml`. Enter required information at the prompt
+# Similar to the vagrant automated test just we dont spawn vagrant machine but using existing machine.
+#
+#
+- hosts: localhost
+  tasks:
+    - pause:
+        prompt: Enter remote machine IP address. Hit enter to reuse existing (asume you re-run and re-use the test-host.yaml data)
+      register: remote_ip
+
+    - when: 'remote_ip.user_input != ""'
+      block:
+      - pause:
+          prompt: Enter remote machine ssh port (22)
+        register: remote_port
+
+      - pause:
+          prompt: Enter remote user (root)
+        register: remote_user
+
+      - pause:
+          prompt: Enter the path to the private key used to access remote host (empty means use pasword)
+        register: ssh_key_path
+      - when: 'ssh_key_path.user_input == ""'
+        pause:
+          prompt: Enter remote user password
+          echo: no
+        register: remote_password
+
+      - pause:
+          prompt: Enter ansible role to test (common)
+        register: test_role
+
+      - name: cache it to a yaml file
+        copy:
+          content: |
+            ansible_ssh_host: "{{ remote_ip.user_input }}"
+            ansible_ssh_port: "{{ remote_port.user_input | int if remote_port.user_input != '' else 22 }}"
+            ansible_user: "{{ remote_user.user_input if remote_user.user_input != '' else 'root' }}"
+            ansible_ssh_pass: '{{ remote_password.user_input }}'
+            ansible_ssh_private_key_file: "{{ ssh_key_path.user_input if ssh_key_path.user_input != '' else '' }}"
+            test_role: "{{ test_role.user_input if test_role.user_input != '' else 'common' }}"
+          dest: "{{ playbook_dir }}/test-host-vars.yaml"
+
+    - include_vars: "{{ playbook_dir }}/test-host-vars.yaml"
+
+    - name: Add host test_host_manual
+      add_host:
+        name: "test_host"
+        groups: test_host_manual
+        ansible_ssh_host: "{{ ansible_ssh_host }}"
+        ansible_ssh_port: "{{ ansible_ssh_port }}"
+        ansible_user: "{{ ansible_user }}"
+        ansible_ssh_pass: '{{ ansible_ssh_pass }}'
+        ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file }}"
+        test_role: "{{ test_role|default('') }}"
+
+- import_playbook: "run-test.yaml"

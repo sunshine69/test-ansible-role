@@ -1,0 +1,14 @@
+# This is only to pass to vagrant so it will generate the ansible inventory for us
+- hosts: default
+  tasks:
+    - block:
+        - name: cache it to a yaml file
+          copy:
+            content: |
+              ansible_ssh_host: "{{ ansible_default_ipv4.address }}"
+              ansible_ssh_port: 22
+              ansible_user: "vagrant"
+              ansible_ssh_private_key_file: "~/.vagrant.d/insecure_private_key"
+            dest: "{{ playbook_dir }}/test-host-vars.yaml"
+      delegate_to: localhost
+      become: no

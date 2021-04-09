@@ -1,0 +1,41 @@
+- hosts: test_host
+  environment:
+    ANSIBLE_VAULT_PASSWORD_FILE: ~/.ansible/vault/password/ansible-vault-test
+  become: yes
+  tasks:
+    - stat:
+        path: "{{ playbook_dir }}/test-role-{{ test_role }}-vars.yaml"
+      register: test_role_var
+      delegate_to: localhost
+      become: no
+
+    - when: 'test_role_var.stat.exists'
+      include_vars: "{{ playbook_dir }}/test-role-{{ test_role }}-vars.yaml"
+
+    - when: 'test_roles is not defined or test_roles|length == 0'
+      set_fact:
+        test_roles: "{{ (test_role | replace(' ','')).split(',') }}"
+
+    - stat:
+        path: "{{ playbook_dir }}/pre-tasks-for-test-role-{{ test_roles[-1] }}.yaml"
+      register: pre_task_file
+      delegate_to: localhost
+      become: no
+
+    - include_tasks: "{{ playbook_dir }}/pre-tasks-for-test-role-{{ test_roles[-1] }}.yaml"
+      when: 'pre_task_file.stat.exists'
+
+    - include_role:
+        name: "./roles/{{ role_name }}"
+      loop: "{{ test_roles }}"
+      loop_control:
+        loop_var: role_name
+
+    - stat:
+        path: "{{ playbook_dir }}/post-tasks-for-test-role-{{ test_roles[-1] }}.yaml"
+      register: post_task_file
+      delegate_to: localhost
+      become: no
+
+    - include_tasks: "{{ playbook_dir }}/post-tasks-for-test-role-{{ test_roles[-1] }}.yaml"
+      when: 'post_task_file.stat.exists'
